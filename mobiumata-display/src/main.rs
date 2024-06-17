@@ -21,7 +21,7 @@ use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::*;
 use mobiumata_common::automaton::ElementaryCellularAutomaton;
 use mobiumata_common::display::{Display, HEIGHT, NUM_LEDS, WIDTH};
-use mobiumata_common::network::{init_network, Mode};
+use mobiumata_common::network::{init_network, udp_listen, Mode};
 use mobiumata_common::state::State;
 use mobiumata_ws2812::Ws2812;
 use rand::Rng;
@@ -48,34 +48,6 @@ fn hsv(hue: u8, sat: u8, val: u8) -> Rgb888 {
         val: (val as u16 * (BRIGHTNESS as u16 + 1) / 256) as u8,
     });
     Rgb888::new(rgb.r, rgb.g, rgb.b)
-}
-
-#[embassy_executor::task]
-async fn udp_listen(
-    stack: &'static Stack<cyw43::NetDriver<'static>>,
-    signal: &'static Signal<NoopRawMutex, State>,
-) {
-    let mut rx_buffer = [0; 4096];
-    let mut rx_meta = [PacketMetadata::EMPTY; 8];
-    let mut tx_buffer = [0; 4096];
-    let mut tx_meta = [PacketMetadata::EMPTY; 8];
-
-    let mut socket = UdpSocket::new(
-        stack,
-        &mut rx_meta,
-        &mut rx_buffer,
-        &mut tx_meta,
-        &mut tx_buffer,
-    );
-    socket.bind(1234).expect("bind failed");
-
-    loop {
-        let mut buffer = [0; 1024];
-        let (len, addr) = socket.recv_from(&mut buffer).await.expect("recv failed");
-        info!("received {:?} from {:?}", buffer[..len], addr);
-        let (state, _) = serde_json_core::from_slice(&buffer[..len]).expect("deserialize failed");
-        signal.signal(state);
-    }
 }
 
 #[embassy_executor::main]

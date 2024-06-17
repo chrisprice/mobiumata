@@ -14,7 +14,7 @@ use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_sync::signal::Signal;
 use embassy_time::Timer;
 use embedded_graphics::pixelcolor::Rgb888;
-use mobiumata_common::network::{init_network, Mode};
+use mobiumata_common::network::{init_network, udp_send, Mode};
 use mobiumata_common::state::State;
 use mobiumata_control::Buttons;
 use mobiumata_ws2812::Ws2812;
@@ -42,39 +42,6 @@ bind_interrupts!(struct Irqs0 {
 bind_interrupts!(struct Irqs1 {
     PIO1_IRQ_0 => InterruptHandler<PIO1>;
 });
-
-#[embassy_executor::task]
-async fn udp_send(
-    stack: &'static Stack<cyw43::NetDriver<'static>>,
-    signal: &'static Signal<NoopRawMutex, State>,
-) {
-    let mut rx_buffer = [0; 1024];
-    let mut rx_meta = [PacketMetadata::EMPTY; 8];
-    let mut tx_buffer = [0; 1024];
-    let mut tx_meta = [PacketMetadata::EMPTY; 8];
-
-    let mut socket = UdpSocket::new(
-        stack,
-        &mut rx_meta,
-        &mut rx_buffer,
-        &mut tx_meta,
-        &mut tx_buffer,
-    );
-    socket.bind(1234).expect("bind failed");
-
-    loop {
-        let state = signal.wait().await;
-        let mut buffer = [0; 1024];
-
-        let size = serde_json_core::to_slice(&state, &mut buffer).expect("serialize failed");
-        socket
-            .send_to(&buffer[..size], (Ipv4Address::BROADCAST, 1234))
-            .await
-            .expect("send failed");
-
-        info!("State: {:?}", state);
-    }
-}
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {

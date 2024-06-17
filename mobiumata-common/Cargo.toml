@@ -36,4 +36,5 @@ embassy-time = { version = "0.3.0", features = [
     "defmt",
     "defmt-timestamp-uptime",
 ] }
+embassy-sync = { version = "0.6.0", features = ["defmt"] }
 

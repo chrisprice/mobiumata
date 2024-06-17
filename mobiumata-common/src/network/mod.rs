@@ -1,15 +1,20 @@
 use cyw43_pio::PioSpi;
 use embassy_executor::Spawner;
-use embassy_net::{Config, Ipv4Cidr, Stack, StackResources, StaticConfigV4};
+use embassy_net::{
+    udp::{PacketMetadata, UdpSocket}, Config, Ipv4Address, Ipv4Cidr, Stack, StackResources, StaticConfigV4
+};
 use embassy_rp::{
     clocks::RoscRng,
     gpio::Output,
     peripherals::{DMA_CH0, PIN_23, PIN_25, PIO0},
 };
+use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use embassy_time::Timer;
 use heapless::Vec;
 use rand::RngCore;
 use static_cell::StaticCell;
+
+use crate::state::State;
 
 pub enum Mode {
     AccessPoint { channel: u8 },
@@ -58,9 +63,7 @@ pub async fn init_network(
 
     match mode {
         Mode::AccessPoint { channel } => {
-            control
-                .start_ap_wpa2(ssid, passphrase, channel)
-                .await;
+            control.start_ap_wpa2(ssid, passphrase, channel).await;
         }
         Mode::Station => {
             control
@@ -91,4 +94,62 @@ async fn wifi_task(
 #[embassy_executor::task]
 async fn net_task(stack: &'static Stack<cyw43::NetDriver<'static>>) -> ! {
     stack.run().await
+}
+
+#[embassy_executor::task]
+pub async fn udp_listen(
+    stack: &'static Stack<cyw43::NetDriver<'static>>,
+    signal: &'static Signal<NoopRawMutex, State>,
+) {
+    let mut rx_buffer = [0; 1024];
+    let mut rx_meta = [PacketMetadata::EMPTY; 8];
+    let mut tx_buffer = [0; 1024];
+    let mut tx_meta = [PacketMetadata::EMPTY; 8];
+
+    let mut socket = UdpSocket::new(
+        stack,
+        &mut rx_meta,
+        &mut rx_buffer,
+        &mut tx_meta,
+        &mut tx_buffer,
+    );
+    socket.bind(1234).expect("bind failed");
+
+    loop {
+        let mut buffer = [0; 1024];
+        let (len, _) = socket.recv_from(&mut buffer).await.expect("recv failed");
+        let (state, _) = serde_json_core::from_slice(&buffer[..len]).expect("deserialize failed");
+        signal.signal(state);
+    }
+}
+
+#[embassy_executor::task]
+pub async fn udp_send(
+    stack: &'static Stack<cyw43::NetDriver<'static>>,
+    signal: &'static Signal<NoopRawMutex, State>,
+) {
+    let mut rx_buffer = [0; 1024];
+    let mut rx_meta = [PacketMetadata::EMPTY; 8];
+    let mut tx_buffer = [0; 1024];
+    let mut tx_meta = [PacketMetadata::EMPTY; 8];
+
+    let mut socket = UdpSocket::new(
+        stack,
+        &mut rx_meta,
+        &mut rx_buffer,
+        &mut tx_meta,
+        &mut tx_buffer,
+    );
+    socket.bind(1234).expect("bind failed");
+
+    loop {
+        let state = signal.wait().await;
+        let mut buffer = [0; 1024];
+
+        let size = serde_json_core::to_slice(&state, &mut buffer).expect("serialize failed");
+        socket
+            .send_to(&buffer[..size], (Ipv4Address::BROADCAST, 1234))
+            .await
+            .expect("send failed");
+    }
 }
