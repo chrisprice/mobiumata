@@ -1,0 +1,3 @@
+[workspace]
+resolver = "2"
+members = ["mobiumata-display", "mobiumata-common", "mobiumata-control", "mobiumata-ws2812"]
