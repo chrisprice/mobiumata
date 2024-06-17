@@ -52,6 +52,7 @@ impl<
         P10: Pin,
     > Buttons<'a, P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10>
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         rule_0: impl Peripheral<P = P0> + 'a,
         rule_1: impl Peripheral<P = P1> + 'a,
@@ -102,7 +103,7 @@ impl<
         }
     }
 
-    pub async fn wait_for_any_edge(&mut self) -> () {
+    pub async fn wait_for_any_edge(&mut self) {
         select3(
             select4(
                 self.rule_0.wait_for_any_edge(),
@@ -155,12 +156,10 @@ impl<
 
         let wrap = if self.wrap_0.is_high() {
             Wrap::Zero
+        } else if self.wrap_1.is_high() {
+            Wrap::One
         } else {
-            if self.wrap_1.is_high() {
-                Wrap::One
-            } else {
-                Wrap::Wrap
-            }
+            Wrap::Wrap
         };
 
         let step = Step::new(self.step.is_high());

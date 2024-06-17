@@ -1,11 +1,10 @@
-use core::{convert::Infallible, ops::Range};
+use core::convert::Infallible;
 
 use embassy_futures::join::join;
 use embassy_rp::peripherals::PIO1;
 use embedded_graphics::{pixelcolor::Rgb888, prelude::*};
 use ws2812::Ws2812;
 
-pub mod hsv;
 pub mod ws2812;
 
 pub const WIDTH: usize = 8;
@@ -51,8 +50,10 @@ impl<'d> Display<'d> {
 
     pub async fn flush(&mut self) {
         join(
-            self.ws2812_1.write(self.data[0..NUM_LEDS_PER_PIN].iter().copied()),
-            self.ws2812_2.write(self.data[NUM_LEDS_PER_PIN..NUM_LEDS].iter().copied()),
+            self.ws2812_1
+                .write(self.data[0..NUM_LEDS_PER_PIN].iter().copied()),
+            self.ws2812_2
+                .write(self.data[NUM_LEDS_PER_PIN..NUM_LEDS].iter().copied()),
         )
         .await;
     }

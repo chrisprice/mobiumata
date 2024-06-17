@@ -1,8 +1,6 @@
 use defmt::Format;
 use serde::{Deserialize, Serialize};
 
-use crate::display::HEIGHT;
-
 #[derive(Clone, Copy, Debug, PartialEq, Format, Serialize, Deserialize)]
 pub struct Rule(u8);
 
@@ -23,7 +21,10 @@ pub struct ElementaryCellularAutomaton {
 
 impl ElementaryCellularAutomaton {
     pub fn new(wrapping: Wrap, rule: Rule) -> Self {
-        Self { wrap: wrapping, rule }
+        Self {
+            wrap: wrapping,
+            rule,
+        }
     }
 
     pub fn next(&self, state: &[bool], next_state: &mut [bool]) {
@@ -41,7 +42,11 @@ impl ElementaryCellularAutomaton {
         }
     }
 
-    pub fn next_row<const W: usize, const H: usize>(&self, state: &mut [[bool; W]; H], index: usize) {
+    pub fn next_row<const W: usize, const H: usize>(
+        &self,
+        state: &mut [[bool; W]; H],
+        index: usize,
+    ) {
         assert!(H > 2);
         let (previous_row, next_row) = if index == 0 {
             let (tail, head) = state.split_at_mut(1);
@@ -89,19 +94,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_elementary_cellular_automaton() {        
+    fn test_elementary_cellular_automaton() {
         // https://mathworld.wolfram.com/Rule30.html
         let automaton = ElementaryCellularAutomaton::new(Wrap::Zero, Rule::new(30));
         let mut next_state = [false; 9];
-        
+
         let mut state = [false, false, false, false, true, false, false, false, false];
         automaton.next(&state, &mut next_state);
 
-        assert_eq!(next_state, [false, false, false, true, true, true, false, false, false]);
+        assert_eq!(
+            next_state,
+            [false, false, false, true, true, true, false, false, false]
+        );
 
         state.copy_from_slice(&next_state);
         automaton.next(&state, &mut next_state);
 
-        assert_eq!(next_state, [false, false, true, true, false, false, true, false, false]);
-     }
+        assert_eq!(
+            next_state,
+            [false, false, true, true, false, false, true, false, false]
+        );
+    }
 }
