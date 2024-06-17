@@ -1115,13 +1115,17 @@ dependencies = [
  "cyw43-pio",
  "defmt",
  "embassy-executor",
+ "embassy-futures",
  "embassy-net",
  "embassy-rp",
  "embassy-sync 0.6.0",
  "embassy-time",
  "embedded-graphics",
  "embedded-graphics-core",
+ "fixed",
+ "fixed-macro",
  "heapless 0.8.0",
+ "pio",
  "rand",
  "serde",
  "serde-json-core",
@@ -1153,7 +1157,6 @@ dependencies = [
  "fixed-macro",
  "heapless 0.8.0",
  "mobiumata-common",
- "mobiumata-ws2812",
  "panic-probe",
  "pio",
  "portable-atomic",
@@ -1186,7 +1189,6 @@ dependencies = [
  "fixed-macro",
  "heapless 0.8.0",
  "mobiumata-common",
- "mobiumata-ws2812",
  "panic-probe",
  "pio",
  "portable-atomic",
@@ -1195,19 +1197,6 @@ dependencies = [
  "serde-json-core",
  "smart-leds",
  "static_cell",
-]
-
-[[package]]
-name = "mobiumata-ws2812"
-version = "0.1.0"
-dependencies = [
- "embassy-rp",
- "embassy-time",
- "embedded-graphics",
- "embedded-graphics-core",
- "fixed",
- "fixed-macro",
- "pio",
 ]
 
 [[package]]

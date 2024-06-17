@@ -1,5 +1,4 @@
-#![no_std]
-
+// Taken from https://github.com/embassy-rs/embassy/blob/main/examples/rp/src/bin/pio_ws2812.rs
 use embassy_rp::dma::{AnyChannel, Channel};
 use embassy_rp::pio::{
     Common, Config, FifoJoin, Instance, PioPin, ShiftConfig, ShiftDirection, StateMachine,

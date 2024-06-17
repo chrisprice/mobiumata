@@ -38,3 +38,7 @@ embassy-time = { version = "0.3.0", features = [
 ] }
 embassy-sync = { version = "0.6.0", features = ["defmt"] }
 
+fixed-macro = "1.2.0"
+fixed = "1.27.0"
+pio = "0.2.1"
+embassy-futures = { version = "0.1.1", features = ["defmt"] }

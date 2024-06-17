@@ -6,24 +6,22 @@ use core::array;
 use cyw43_pio::PioSpi;
 use defmt::*;
 use embassy_executor::Spawner;
-use embassy_futures::join::join;
-use embassy_net::udp::{PacketMetadata, UdpSocket};
-use embassy_net::{Ipv4Address, Ipv4Cidr, Stack};
+use embassy_net::{Ipv4Address, Ipv4Cidr};
 use embassy_rp::bind_interrupts;
 use embassy_rp::clocks::RoscRng;
 use embassy_rp::gpio::{Level, Output};
-use embassy_rp::peripherals::{DMA_CH0, PIN_23, PIN_25, PIO0, PIO1};
-use embassy_rp::pio::{Instance, InterruptHandler, Pio};
+use embassy_rp::peripherals::{PIO0, PIO1};
+use embassy_rp::pio::{InterruptHandler, Pio};
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_sync::signal::Signal;
 use embassy_time::{Duration, Ticker};
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::*;
 use mobiumata_common::automaton::ElementaryCellularAutomaton;
-use mobiumata_common::display::{Display, HEIGHT, NUM_LEDS, WIDTH};
+use mobiumata_common::display::ws2812::Ws2812;
+use mobiumata_common::display::{Display, HEIGHT, WIDTH};
 use mobiumata_common::network::{init_network, udp_listen, Mode};
 use mobiumata_common::state::State;
-use mobiumata_ws2812::Ws2812;
 use rand::Rng;
 use smart_leds::hsv::{hsv2rgb, Hsv};
 use static_cell::StaticCell;
@@ -38,7 +36,9 @@ bind_interrupts!(struct Irqs1 {
     PIO1_IRQ_0 => InterruptHandler<PIO1>;
 });
 
-const NUM_LEDS_PER_PIN: usize = NUM_LEDS / 2;
+const PRIMARY_COLOR: Rgb888 = Rgb888::new(BRIGHTNESS, BRIGHTNESS, BRIGHTNESS);
+const SECONDARY_COLOR: Rgb888 = Rgb888::new(0, 0, BRIGHTNESS);
+
 const BRIGHTNESS: u8 = 16;
 
 fn hsv(hue: u8, sat: u8, val: u8) -> Rgb888 {
@@ -56,12 +56,12 @@ async fn main(spawner: Spawner) {
     let p = embassy_rp::init(Default::default());
 
     let mut pio = Pio::new(p.PIO1, Irqs1);
-    let mut ws2812_1: Ws2812<PIO1, 0, NUM_LEDS_PER_PIN> =
-        Ws2812::new(&mut pio.common, pio.sm0, p.DMA_CH1, p.PIN_27);
-    let mut ws2812_2: Ws2812<PIO1, 1, NUM_LEDS_PER_PIN> =
-        Ws2812::new(&mut pio.common, pio.sm1, p.DMA_CH2, p.PIN_26);
+    let mut display = Display::new(
+        Ws2812::new(&mut pio.common, pio.sm0, p.DMA_CH1, p.PIN_27),
+        Ws2812::new(&mut pio.common, pio.sm1, p.DMA_CH2, p.PIN_26),
+    );
 
-    led(&mut ws2812_1, &mut ws2812_2, hsv(128 + 0, 255, 255)).await;
+    display.clear(SECONDARY_COLOR).unwrap();
 
     let mut pio = Pio::new(p.PIO0, Irqs0);
     let spi = PioSpi::new(
@@ -84,14 +84,13 @@ async fn main(spawner: Spawner) {
     )
     .await;
 
-    led(&mut ws2812_1, &mut ws2812_2, hsv(128 + 40, 255, 255)).await;
+    display.clear(PRIMARY_COLOR).unwrap();
 
     static SIGNAL: StaticCell<Signal<NoopRawMutex, State>> = StaticCell::new();
     let signal = SIGNAL.init(Signal::new());
 
     spawner.spawn(udp_listen(stack, signal)).unwrap();
 
-    let mut display = Display::new();
     static UNIVERSE: StaticCell<[[bool; WIDTH]; HEIGHT]> = StaticCell::new();
     let universe = UNIVERSE.init(array::from_fn(|_| {
         array::from_fn(|_| RoscRng.gen_bool(0.5))
@@ -115,8 +114,6 @@ async fn main(spawner: Spawner) {
                 row.iter().enumerate().map(move |(x, cell)| {
                     let hue = if *cell { 170 } else { 20 };
                     let color = match (y as isize - y_update as isize) % HEIGHT as isize {
-                        // delta if delta > -16 && delta < 0 => hsv(hue, (-delta * 16) as u8, 255),
-                        // 0 => hsv(hue, 0, 255),
                         delta if delta > 0 && delta < 16 => hsv(hue, 255, (delta * 16) as u8),
                         _ => hsv(hue, 255, 255),
                     };
@@ -125,11 +122,7 @@ async fn main(spawner: Spawner) {
             });
             display.draw_iter(pixels).unwrap();
 
-            join(
-                ws2812_1.write(display.data(0..NUM_LEDS_PER_PIN)),
-                ws2812_2.write(display.data(NUM_LEDS_PER_PIN..NUM_LEDS)),
-            )
-            .await;
+            display.flush().await;
 
             if state.step.inner() {
                 for _ in 0..1000 {
@@ -143,14 +136,4 @@ async fn main(spawner: Spawner) {
             }
         }
     }
-}
-
-async fn led(
-    ws2812_1: &mut Ws2812<'_, impl Instance, 0, NUM_LEDS_PER_PIN>,
-    ws2812_2: &mut Ws2812<'_, impl Instance, 1, NUM_LEDS_PER_PIN>,
-    color: Rgb888,
-) {
-    let data = [color; NUM_LEDS_PER_PIN];
-    ws2812_1.write(data.iter().copied()).await;
-    ws2812_2.write(data.iter().copied()).await;
 }

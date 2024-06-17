@@ -15,10 +15,10 @@ use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_sync::signal::Signal;
 use embassy_time::Timer;
 use embedded_graphics::pixelcolor::Rgb888;
+use mobiumata_common::display::ws2812::Ws2812;
 use mobiumata_common::network::{init_network, udp_send, Mode};
 use mobiumata_common::state::State;
 use mobiumata_control::Buttons;
-use mobiumata_ws2812::Ws2812;
 use static_cell::StaticCell;
 
 use {defmt_rtt as _, panic_probe as _};

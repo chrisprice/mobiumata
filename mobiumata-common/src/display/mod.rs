@@ -1,27 +1,34 @@
 use core::{convert::Infallible, ops::Range};
 
+use embassy_futures::join::join;
+use embassy_rp::peripherals::PIO1;
 use embedded_graphics::{pixelcolor::Rgb888, prelude::*};
+use ws2812::Ws2812;
 
 pub mod hsv;
+pub mod ws2812;
 
 pub const WIDTH: usize = 8;
 pub const HEIGHT: usize = 32 * 6;
 pub const NUM_LEDS: usize = WIDTH * HEIGHT;
+const NUM_LEDS_PER_PIN: usize = NUM_LEDS / 2;
 
-#[derive(Debug)]
-pub struct Display<T> {
-    data: [T; NUM_LEDS],
+pub struct Display<'d> {
+    data: [Rgb888; NUM_LEDS],
+    ws2812_1: Ws2812<'d, PIO1, 0, NUM_LEDS_PER_PIN>,
+    ws2812_2: Ws2812<'d, PIO1, 1, NUM_LEDS_PER_PIN>,
 }
 
-impl<T: Copy + Default> Display<T> {
-    pub fn new() -> Self {
+impl<'d> Display<'d> {
+    pub fn new(
+        ws2812_1: Ws2812<'d, PIO1, 0, NUM_LEDS_PER_PIN>,
+        ws2812_2: Ws2812<'d, PIO1, 1, NUM_LEDS_PER_PIN>,
+    ) -> Self {
         Self {
-            data: [T::default(); NUM_LEDS],
+            data: [Rgb888::default(); NUM_LEDS],
+            ws2812_1,
+            ws2812_2,
         }
-    }
-
-    pub fn data(&self, range: Range<usize>) -> DisplayIterator<T> {
-        DisplayIterator::new(self, range)
     }
 
     pub fn get_index(x: usize, y: usize) -> usize {
@@ -32,18 +39,26 @@ impl<T: Copy + Default> Display<T> {
         }
     }
 
-    pub fn get_pixel(&self, x: usize, y: usize) -> T {
+    pub fn get_pixel(&self, x: usize, y: usize) -> Rgb888 {
         let index = Self::get_index(x, y);
         self.data[index]
     }
 
-    pub fn set_pixel(&mut self, x: usize, y: usize, color: T) {
+    pub fn set_pixel(&mut self, x: usize, y: usize, color: Rgb888) {
         let index = Self::get_index(x, y);
         self.data[index] = color;
     }
+
+    pub async fn flush(&mut self) {
+        join(
+            self.ws2812_1.write(self.data[0..NUM_LEDS_PER_PIN].iter().copied()),
+            self.ws2812_2.write(self.data[NUM_LEDS_PER_PIN..NUM_LEDS].iter().copied()),
+        )
+        .await;
+    }
 }
 
-impl DrawTarget for Display<Rgb888> {
+impl<'d> DrawTarget for Display<'d> {
     type Color = Rgb888;
     type Error = Infallible;
 
@@ -66,63 +81,8 @@ impl DrawTarget for Display<Rgb888> {
     }
 }
 
-impl OriginDimensions for Display<Rgb888> {
+impl<'d> OriginDimensions for Display<'d> {
     fn size(&self) -> Size {
         Size::new(HEIGHT as u32, WIDTH as u32)
-    }
-}
-
-pub struct DisplayIterator<'a, T> {
-    display: &'a Display<T>,
-    range: Range<usize>,
-    index: usize,
-}
-
-impl<'a, T: Copy + Default> DisplayIterator<'a, T> {
-    pub fn new(display: &'a Display<T>, range: Range<usize>) -> Self {
-        let index = range.start;
-        Self {
-            display,
-            range,
-            index,
-        }
-    }
-}
-
-impl<'a, T: Copy + Default> Iterator for DisplayIterator<'a, T> {
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index >= self.range.end {
-            return None;
-        }
-
-        self.index += 1;
-
-        Some(self.display.data[self.index - 1])
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use smart_leds::RGB8;
-
-    use super::*;
-    
-
-    #[test]
-    fn test_display() {
-        let mut display = Display::new();
-        display.set_pixel(0, 0, RGB8 { r: 1, g: 2, b: 3 });
-        assert_eq!(display.get_pixel(0, 0), RGB8 { r: 1, g: 2, b: 3 });
-    }
-
-    #[test]
-    fn test_zig_zag() {
-        let mut display = Display::new();
-        display.set_pixel(WIDTH - 1, 0, RGB8 { r: 1, g: 2, b: 3 });
-        display.set_pixel(0, 1, RGB8 { r: 4, g: 5, b: 6 });
-        assert_eq!(display.data[WIDTH - 1], RGB8 { r: 1, g: 2, b: 3 });
-        assert_eq!(display.data[WIDTH], RGB8 { r: 4, g: 5, b: 6 });
     }
 }
