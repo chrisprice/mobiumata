@@ -34,24 +34,14 @@ embassy-time = { version = "0.3.0", features = [
     "defmt",
     "defmt-timestamp-uptime",
 ] }
-embassy-usb = { version = "0.2.0", features = ["defmt"] }
 panic-probe = { version = "0.3", features = ["print-defmt"] }
 static_cell = "2.1.0"
 portable-atomic = { version = "1.5", features = ["critical-section"] }
-cyw43 = { version = "0.1.0", features = ["defmt", "firmware-logs"] }
 cortex-m = { version = "0.7.6", features = ["inline-asm"] }
 cortex-m-rt = "0.7.0"
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
-heapless = { version = "0.8.0", features = ["defmt-03"] }
-fixed-macro = "1.2.0"
 smart-leds = "0.4.0"
-fixed = "1.27.0"
 pio = "0.2.1"
 embassy-sync = { version = "0.6.0", features = ["defmt"] }
 embassy-futures = { version = "0.1.1", features = ["defmt"] }
 embedded-graphics = { version = "0.8.1", features = ["defmt"] }
-embedded-hal = { version = "1.0.0", features = ["defmt-03"] }
-embedded-hal-async = { version = "1.0.0", features = ["defmt-03"] }
-
-serde = { version = "1.0", default-features = false, features = ["derive"] }
-serde-json-core = "0.5.1"
