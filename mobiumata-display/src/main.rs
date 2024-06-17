@@ -3,34 +3,28 @@
 
 use core::array;
 
-use core::fmt::Write;
 use cyw43_pio::PioSpi;
 use defmt::*;
 use embassy_executor::Spawner;
 use embassy_futures::join::join;
 use embassy_net::udp::{PacketMetadata, UdpSocket};
-use embassy_net::{Config, Ipv4Address, Ipv4Cidr, Stack, StackResources, StaticConfigV4};
+use embassy_net::{Ipv4Address, Ipv4Cidr, Stack};
 use embassy_rp::bind_interrupts;
 use embassy_rp::clocks::RoscRng;
 use embassy_rp::gpio::{Level, Output};
 use embassy_rp::peripherals::{DMA_CH0, PIN_23, PIN_25, PIO0, PIO1};
 use embassy_rp::pio::{Instance, InterruptHandler, Pio};
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
-use embassy_sync::channel::{self, Channel, Sender};
-use embassy_sync::signal::{self, Signal};
-use embassy_time::{Duration, Ticker, Timer};
-use embedded_graphics::mono_font::ascii::{FONT_5X8, FONT_6X10};
-use embedded_graphics::mono_font::iso_8859_14::FONT_4X6;
-use embedded_graphics::mono_font::MonoTextStyle;
+use embassy_sync::signal::Signal;
+use embassy_time::{Duration, Ticker};
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::*;
-use embedded_graphics::text::Text;
-use heapless::{String, Vec};
-use mobiumata_common::automaton::{ElementaryCellularAutomaton, Rule, Wrap};
+use mobiumata_common::automaton::ElementaryCellularAutomaton;
 use mobiumata_common::display::{Display, HEIGHT, NUM_LEDS, WIDTH};
+use mobiumata_common::network::{init_network, Mode};
 use mobiumata_common::state::State;
 use mobiumata_ws2812::Ws2812;
-use rand::{Rng, RngCore};
+use rand::Rng;
 use smart_leds::hsv::{hsv2rgb, Hsv};
 use static_cell::StaticCell;
 
@@ -54,22 +48,6 @@ fn hsv(hue: u8, sat: u8, val: u8) -> Rgb888 {
         val: (val as u16 * (BRIGHTNESS as u16 + 1) / 256) as u8,
     });
     Rgb888::new(rgb.r, rgb.g, rgb.b)
-}
-
-#[embassy_executor::task]
-async fn wifi_task(
-    runner: cyw43::Runner<
-        'static,
-        Output<'static, PIN_23>,
-        PioSpi<'static, PIN_25, PIO0, 0, DMA_CH0>,
-    >,
-) -> ! {
-    runner.run().await
-}
-
-#[embassy_executor::task]
-async fn net_task(stack: &'static Stack<cyw43::NetDriver<'static>>) -> ! {
-    stack.run().await
 }
 
 #[embassy_executor::task]
@@ -105,77 +83,34 @@ async fn main(spawner: Spawner) {
     info!("Start");
     let p = embassy_rp::init(Default::default());
 
-    let Pio {
-        mut common,
-        sm0,
-        sm1,
-        ..
-    } = Pio::new(p.PIO1, Irqs1);
-
+    let mut pio = Pio::new(p.PIO1, Irqs1);
     let mut ws2812_1: Ws2812<PIO1, 0, NUM_LEDS_PER_PIN> =
-        Ws2812::new(&mut common, sm0, p.DMA_CH1, p.PIN_27);
+        Ws2812::new(&mut pio.common, pio.sm0, p.DMA_CH1, p.PIN_27);
     let mut ws2812_2: Ws2812<PIO1, 1, NUM_LEDS_PER_PIN> =
-        Ws2812::new(&mut common, sm1, p.DMA_CH2, p.PIN_26);
+        Ws2812::new(&mut pio.common, pio.sm1, p.DMA_CH2, p.PIN_26);
 
     led(&mut ws2812_1, &mut ws2812_2, hsv(128 + 0, 255, 255)).await;
 
-    let fw: &[u8; 230321] = include_bytes!("../../../../.cargo/git/checkouts/embassy-9312dcb0ed774b29/a099084/cyw43-firmware/43439A0.bin");
-    let clm: &[u8; 4752] = include_bytes!("../../../../.cargo/git/checkouts/embassy-9312dcb0ed774b29/a099084/cyw43-firmware/43439A0_clm.bin");
-
     let mut pio = Pio::new(p.PIO0, Irqs0);
-
-    let pwr = Output::new(p.PIN_23, Level::Low);
-    let cs = Output::new(p.PIN_25, Level::High);
     let spi = PioSpi::new(
         &mut pio.common,
         pio.sm0,
         pio.irq0,
-        cs,
+        Output::new(p.PIN_25, Level::High),
         p.PIN_24,
         p.PIN_29,
         p.DMA_CH0,
     );
-
-    static STATE: StaticCell<cyw43::State> = StaticCell::new();
-    let state = STATE.init(cyw43::State::new());
-
-    let (net_device, mut control, runner) = cyw43::new(state, pwr, spi, fw).await;
-    spawner.must_spawn(wifi_task(runner));
-    led(&mut ws2812_1, &mut ws2812_2, hsv(128 + 10, 255, 255)).await;
-
-    control.init(clm).await;
-    control
-        .set_power_management(cyw43::PowerManagementMode::PowerSave)
-        .await;
-    led(&mut ws2812_1, &mut ws2812_2, hsv(128 + 20, 255, 255)).await;
-
-    let config = Config::ipv4_static(StaticConfigV4 {
-        address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 1, 218), 24),
-        gateway: None,
-        dns_servers: Vec::new(),
-    });
-
-    static STACK: StaticCell<Stack<cyw43::NetDriver<'static>>> = StaticCell::new();
-    static RESOURCES: StaticCell<StackResources<2>> = StaticCell::new();
-    let stack = &*STACK.init(Stack::new(
-        net_device,
-        config,
-        RESOURCES.init(StackResources::<2>::new()),
-        RoscRng.next_u64(),
-    ));
-
-    spawner.must_spawn(net_task(stack));
-
-    control
-        .join_wpa2(env!("WIFI_SSID"), env!("WIFI_PASSPHRASE"))
-        .await
-        .expect("join failed");
-
-    led(&mut ws2812_1, &mut ws2812_2, hsv(128 + 30, 255, 255)).await;
-
-    while !stack.is_config_up() {
-        Timer::after_millis(100).await;
-    }
+    let stack = init_network(
+        spawner,
+        Mode::Station,
+        env!("WIFI_SSID"),
+        env!("WIFI_PASSPHRASE"),
+        Ipv4Cidr::new(Ipv4Address::new(192, 168, 1, 218), 24),
+        spi,
+        Output::new(p.PIN_23, Level::Low),
+    )
+    .await;
 
     led(&mut ws2812_1, &mut ws2812_2, hsv(128 + 40, 255, 255)).await;
 
@@ -186,7 +121,9 @@ async fn main(spawner: Spawner) {
 
     let mut display = Display::new();
     static UNIVERSE: StaticCell<[[bool; WIDTH]; HEIGHT]> = StaticCell::new();
-    let universe = UNIVERSE.init(array::from_fn(|_| array::from_fn(|_| RoscRng.gen_bool(0.5))));
+    let universe = UNIVERSE.init(array::from_fn(|_| {
+        array::from_fn(|_| RoscRng.gen_bool(0.5))
+    }));
     let mut ticker = Ticker::every(Duration::from_millis(10));
     let mut state = State::default();
 

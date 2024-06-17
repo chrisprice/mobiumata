@@ -12,3 +12,28 @@ rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 smart-leds = "0.4.0"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde-json-core = "0.5.1"
+cyw43-pio = { version = "0.1.0", features = ["defmt", "overclock"] }
+embassy-rp = { version = "0.1.0", features = ["defmt"] }
+static_cell = "2.1.0"
+cyw43 = { version = "0.1.0", features = ["defmt", "firmware-logs"] }
+embassy-executor = { version = "0.5.0", features = [
+    "task-arena-size-32768",
+    "arch-cortex-m",
+    "executor-thread",
+    "executor-interrupt",
+    "defmt",
+    "integrated-timers",
+] }
+embassy-net = { version = "0.4.0", features = [
+    "defmt",
+    "tcp",
+    "udp",
+    "dns",
+    "dhcpv4",
+    "medium-ethernet",
+] }
+embassy-time = { version = "0.3.0", features = [
+    "defmt",
+    "defmt-timestamp-uptime",
+] }
+

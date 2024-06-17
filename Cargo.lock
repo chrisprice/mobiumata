@@ -1111,7 +1111,13 @@ checksum = "c3c8dda44ff03a2f238717214da50f65d5a53b45cd213a7370424ffdb6fae815"
 name = "mobiumata-common"
 version = "0.1.0"
 dependencies = [
+ "cyw43",
+ "cyw43-pio",
  "defmt",
+ "embassy-executor",
+ "embassy-net",
+ "embassy-rp",
+ "embassy-time",
  "embedded-graphics",
  "embedded-graphics-core",
  "heapless 0.8.0",
@@ -1119,6 +1125,7 @@ dependencies = [
  "serde",
  "serde-json-core",
  "smart-leds",
+ "static_cell",
 ]
 
 [[package]]
