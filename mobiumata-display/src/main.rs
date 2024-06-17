@@ -36,8 +36,8 @@ bind_interrupts!(struct Irqs1 {
     PIO1_IRQ_0 => InterruptHandler<PIO1>;
 });
 
-const PRIMARY_COLOR: Rgb888 = Rgb888::new(BRIGHTNESS, BRIGHTNESS, BRIGHTNESS);
-const SECONDARY_COLOR: Rgb888 = Rgb888::new(0, 0, BRIGHTNESS);
+const PRIMARY_COLOR: Rgb888 = Rgb888::new(0, 0, 0);
+const SECONDARY_COLOR: Rgb888 = Rgb888::new(1, 1, 1);
 
 const BRIGHTNESS: u8 = 16;
 
@@ -62,6 +62,7 @@ async fn main(spawner: Spawner) {
     );
 
     display.clear(SECONDARY_COLOR).unwrap();
+    display.flush().await;
 
     let mut pio = Pio::new(p.PIO0, Irqs0);
     let spi = PioSpi::new(
@@ -85,6 +86,7 @@ async fn main(spawner: Spawner) {
     .await;
 
     display.clear(PRIMARY_COLOR).unwrap();
+    display.flush().await;
 
     static SIGNAL: StaticCell<Signal<NoopRawMutex, State>> = StaticCell::new();
     let signal = SIGNAL.init(Signal::new());
@@ -108,22 +110,32 @@ async fn main(spawner: Spawner) {
             let automaton = ElementaryCellularAutomaton::new(state.wrap, state.rule);
             automaton.next_row(universe, y_update);
 
-            display.clear(Rgb888::new(0, 0, 0)).unwrap();
-
             let pixels = universe.iter().enumerate().flat_map(|(y, row)| {
                 row.iter().enumerate().map(move |(x, cell)| {
-                    let hue = if *cell { 170 } else { 20 };
-                    let color = match (y as isize - y_update as isize) % HEIGHT as isize {
-                        delta if delta > 0 && delta < 16 => hsv(hue, 255, (delta * 16) as u8),
-                        _ => hsv(hue, 255, 255),
-                    };
-                    Pixel(Point::new(y as i32, (WIDTH - 1 - x) as i32), color)
+                    let mut hue = 15;
+                    let mut saturation = 255;
+                    let value = 255;
+                    if *cell {
+                        hue = 170;
+                        // p < 0.01 seems to misbehave, so AND for an effective p of 0.0001
+                        if RoscRng.gen_bool(0.01) && RoscRng.gen_bool(0.01) {
+                            saturation = 127;
+                        }
+                    }
+                    if state.step.inner() {
+                        if y == y_update {
+                            saturation = 191;
+                        }
+                    }
+                    Pixel(
+                        Point::new(y as i32, (WIDTH - 1 - x) as i32),
+                        hsv(hue, saturation, value),
+                    )
                 })
             });
+
             display.draw_iter(pixels).unwrap();
-
             display.flush().await;
-
             if state.step.inner() {
                 for _ in 0..1000 {
                     ticker.next().await;
