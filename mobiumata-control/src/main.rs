@@ -1,15 +1,16 @@
 #![no_std]
 #![no_main]
 
+use core::iter::once;
+
 use cyw43_pio::PioSpi;
 use defmt::*;
 use embassy_executor::Spawner;
-use embassy_net::udp::{PacketMetadata, UdpSocket};
-use embassy_net::{Ipv4Address, Ipv4Cidr, Stack};
+use embassy_net::{Ipv4Address, Ipv4Cidr};
 use embassy_rp::bind_interrupts;
 use embassy_rp::gpio::{Level, Output};
 use embassy_rp::peripherals::{PIO0, PIO1};
-use embassy_rp::pio::{Instance, InterruptHandler, Pio};
+use embassy_rp::pio::{InterruptHandler, Pio};
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_sync::signal::Signal;
 use embassy_time::Timer;
@@ -18,22 +19,13 @@ use mobiumata_common::network::{init_network, udp_send, Mode};
 use mobiumata_common::state::State;
 use mobiumata_control::Buttons;
 use mobiumata_ws2812::Ws2812;
-use smart_leds::hsv::{hsv2rgb, Hsv};
 use static_cell::StaticCell;
 
 use {defmt_rtt as _, panic_probe as _};
 
 const DEBOUNCE_DURATION: u64 = 25;
-const BRIGHTNESS: u8 = 255;
-
-fn hsv(hue: u8, sat: u8, val: u8) -> Rgb888 {
-    let rgb = hsv2rgb(Hsv {
-        hue,
-        sat,
-        val: (val as u16 * (BRIGHTNESS as u16 + 1) / 256) as u8,
-    });
-    Rgb888::new(rgb.r, rgb.g, rgb.b)
-}
+const PRIMARY_COLOR: Rgb888 = Rgb888::new(255, 255, 255);
+const SECONDARY_COLOR: Rgb888 = Rgb888::new(0, 0, 255);
 
 bind_interrupts!(struct Irqs0 {
     PIO0_IRQ_0 => InterruptHandler<PIO0>;
@@ -51,7 +43,7 @@ async fn main(spawner: Spawner) {
     let mut pio = Pio::new(p.PIO1, Irqs1);
     let mut ws2812: Ws2812<PIO1, 0, 2> = Ws2812::new(&mut pio.common, pio.sm0, p.DMA_CH1, p.PIN_28);
 
-    led(&mut ws2812, hsv(128 + 0, 255, 255)).await;
+    ws2812.write(once(SECONDARY_COLOR)).await;
 
     let mut pio = Pio::new(p.PIO0, Irqs0);
     let spi = PioSpi::new(
@@ -74,7 +66,7 @@ async fn main(spawner: Spawner) {
     )
     .await;
 
-    led(&mut ws2812, hsv(128 + 40, 255, 255)).await;
+    ws2812.write(once(PRIMARY_COLOR)).await;
 
     static SIGNAL: StaticCell<Signal<NoopRawMutex, State>> = StaticCell::new();
     let signal = SIGNAL.init(Signal::new());
@@ -88,6 +80,14 @@ async fn main(spawner: Spawner) {
 
     let mut state_1 = buttons.read_state();
     loop {
+        ws2812
+            .write(once(if state_1.step.inner() {
+                SECONDARY_COLOR
+            } else {
+                PRIMARY_COLOR
+            }))
+            .await;
+
         buttons.wait_for_any_edge().await;
 
         Timer::after_millis(DEBOUNCE_DURATION).await;
@@ -99,12 +99,4 @@ async fn main(spawner: Spawner) {
             state_1 = state_2;
         }
     }
-}
-
-async fn led(ws2812: &mut Ws2812<'_, impl Instance, 0, 2>, color: Rgb888) {
-    let data = [
-        color,
-        Rgb888::new(255, 0, 0), // WHITE BYTE
-    ];
-    ws2812.write(data.into_iter()).await;
 }
