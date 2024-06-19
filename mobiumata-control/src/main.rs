@@ -78,25 +78,22 @@ async fn main(spawner: Spawner) {
         p.PIN_10,
     );
 
-    let mut state_1 = buttons.read_state();
+    let mut last_broadcast_state = buttons.read_state();
     loop {
-        ws2812
-            .write(once(if state_1.step.inner() {
-                SECONDARY_COLOR
-            } else {
-                PRIMARY_COLOR
-            }))
-            .await;
-
         buttons.wait_for_any_edge().await;
 
-        Timer::after_millis(DEBOUNCE_DURATION).await;
+        loop {
+            let state = buttons.read_state();
 
-        let state_2 = buttons.read_state();
+            Timer::after_millis(DEBOUNCE_DURATION).await;
 
-        if state_1 != state_2 {
-            signal.signal(state_2);
-            state_1 = state_2;
+            if state == buttons.read_state() {
+                if last_broadcast_state != state {
+                    last_broadcast_state = state;
+                    signal.signal(state);
+                }
+                break;
+            }
         }
     }
 }
