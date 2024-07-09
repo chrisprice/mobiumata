@@ -37,9 +37,6 @@ bind_interrupts!(struct Irqs1 {
     PIO1_IRQ_0 => InterruptHandler<PIO1>;
 });
 
-const PRIMARY_COLOR: Rgb888 = Rgb888::new(0, 0, 0);
-const SECONDARY_COLOR: Rgb888 = Rgb888::new(1, 1, 1);
-
 const BRIGHTNESS: u8 = 16;
 
 fn hsv(hue: u8, sat: u8, val: u8) -> Rgb888 {
@@ -62,9 +59,6 @@ async fn main(spawner: Spawner) {
         Ws2812::new(&mut pio.common, pio.sm1, p.DMA_CH2, p.PIN_26),
     );
 
-    display.clear(SECONDARY_COLOR).unwrap();
-    display.flush().await;
-
     let mut pio = Pio::new(p.PIO0, Irqs0);
     let spi = PioSpi::new(
         &mut pio.common,
@@ -85,9 +79,6 @@ async fn main(spawner: Spawner) {
         Output::new(p.PIN_23, Level::Low),
     )
     .await;
-
-    display.clear(PRIMARY_COLOR).unwrap();
-    display.flush().await;
 
     static SIGNAL: StaticCell<Signal<NoopRawMutex, State>> = StaticCell::new();
     let signal = SIGNAL.init(Signal::new());
