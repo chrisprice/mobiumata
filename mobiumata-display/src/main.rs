@@ -76,7 +76,7 @@ async fn main(spawner: Spawner) {
     );
     let stack = init_network(
         spawner,
-        Mode::Station,
+        Mode::AccessPoint { channel: 5 },
         env!("WIFI_SSID"),
         env!("WIFI_PASSPHRASE"),
         Ipv4Cidr::new(Ipv4Address::new(192, 168, 1, 218), 24),
