@@ -101,6 +101,8 @@ async fn main(spawner: Spawner) {
     let mut state = State::default();
     let mut ticker = RunStepTicker::new(state.step);
 
+    spawner.spawn(idle_reset(signal)).unwrap();
+
     loop {
         for y_update in 0..HEIGHT {
             if let Some(new_state) = signal.try_take() {
@@ -158,5 +160,18 @@ impl RunStepTicker {
             *self = Self::new(step);
         }
         self.ticker.next().await
+    }
+}
+
+#[embassy_executor::task]
+async fn idle_reset(signal: &'static Signal<NoopRawMutex, State>) {
+    const IDLE_RESET_DURATION: Duration = Duration::from_secs(30);
+    loop {
+        if let Either::First(_) = select(Timer::after(IDLE_RESET_DURATION), signal.wait()).await {
+            info!("Idle");
+            signal.signal(State::default());
+        } else {
+            info!("Reset timer");
+        }
     }
 }
