@@ -6,6 +6,7 @@ use core::array;
 use cyw43_pio::PioSpi;
 use defmt::*;
 use embassy_executor::Spawner;
+use embassy_futures::select::{select, Either};
 use embassy_net::{Ipv4Address, Ipv4Cidr};
 use embassy_rp::bind_interrupts;
 use embassy_rp::clocks::RoscRng;
@@ -14,14 +15,14 @@ use embassy_rp::peripherals::{PIO0, PIO1};
 use embassy_rp::pio::{InterruptHandler, Pio};
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_sync::signal::Signal;
-use embassy_time::{Duration, Ticker};
+use embassy_time::{Duration, Ticker, Timer};
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::*;
 use mobiumata_common::automaton::ElementaryCellularAutomaton;
 use mobiumata_common::display::ws2812::Ws2812;
 use mobiumata_common::display::{Display, HEIGHT, WIDTH};
 use mobiumata_common::network::{init_network, udp_listen, Mode};
-use mobiumata_common::state::State;
+use mobiumata_common::state::{State, Step};
 use rand::Rng;
 use smart_leds::hsv::{hsv2rgb, Hsv};
 use static_cell::StaticCell;
@@ -97,8 +98,8 @@ async fn main(spawner: Spawner) {
     let universe = UNIVERSE.init(array::from_fn(|_| {
         array::from_fn(|_| RoscRng.gen_bool(0.5))
     }));
-    let mut ticker = Ticker::every(Duration::from_millis(10));
     let mut state = State::default();
+    let mut ticker = RunStepTicker::new(state.step);
 
     loop {
         for y_update in 0..HEIGHT {
@@ -127,16 +128,35 @@ async fn main(spawner: Spawner) {
 
             display.draw_iter(pixels).unwrap();
             display.flush().await;
-            if state.step.inner() {
-                for _ in 0..1000 {
-                    ticker.next().await;
-                    if signal.signaled() {
-                        break;
-                    }
-                }
-            } else {
-                ticker.next().await;
-            }
+
+            ticker.next(state.step).await;
         }
+    }
+}
+
+struct RunStepTicker {
+    ticker: Ticker,
+    step: Step,
+}
+
+impl RunStepTicker {
+    const RUN_TICK_DURATION: Duration = Duration::from_millis(10);
+    const STEP_TICK_DURATION: Duration = Duration::from_secs(1);
+
+    fn new(step: Step) -> Self {
+        Self {
+            ticker: Ticker::every(if step.inner() {
+                Self::STEP_TICK_DURATION
+            } else {
+                Self::RUN_TICK_DURATION
+            }),
+            step,
+        }
+    }
+    async fn next(&mut self, step: Step) {
+        if self.step != step {
+            *self = Self::new(step);
+        }
+        self.ticker.next().await
     }
 }
