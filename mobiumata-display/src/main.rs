@@ -113,19 +113,10 @@ async fn main(spawner: Spawner) {
             let pixels = universe.iter().enumerate().flat_map(|(y, row)| {
                 row.iter().enumerate().map(move |(x, cell)| {
                     let mut hue = 15;
-                    let mut saturation = 255;
+                    let saturation = 255;
                     let value = 255;
                     if *cell {
                         hue = 170;
-                        // p < 0.01 seems to misbehave, so AND for an effective p of 0.0001
-                        if RoscRng.gen_bool(0.01) && RoscRng.gen_bool(0.01) {
-                            saturation = 127;
-                        }
-                    }
-                    if state.step.inner() {
-                        if y == y_update {
-                            saturation = 191;
-                        }
                     }
                     Pixel(
                         Point::new(y as i32, (WIDTH - 1 - x) as i32),
