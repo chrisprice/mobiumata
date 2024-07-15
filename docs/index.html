@@ -50,7 +50,7 @@
 
             window.addEventListener("hashchange", () => location.reload());
 
-            const mod = await WebAssembly.compileStreaming(fetch("target/wasm32-unknown-unknown/release/mobiumata_virtual_display.wasm"));
+            const mod = await WebAssembly.compileStreaming(fetch("mobiumata_virtual_display.wasm"));
             const instance = await WebAssembly.instantiate(mod);
 
             const { exports: { ecm_next_zero, ecm_next_wrap, ecm_next_one, ecm_zero_period, ecm_wrap_period, ecm_one_period } } = instance;
