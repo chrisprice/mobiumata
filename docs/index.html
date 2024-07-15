@@ -11,18 +11,13 @@
             color: #f4af2d;
         }
 
+        a {
+            color: inherit;
+        }
+
         table {
-            width: 100%;
             border-collapse: separate;
             border-spacing: 10px;
-        }
-
-        th {
-            width: 33%;
-        }
-
-        th:first-child {
-            width: 0%;
         }
 
         td:first-child {
@@ -31,15 +26,25 @@
 
         canvas {
             image-rendering: pixelated;
-            width: 100%;
+            width: calc(192px * 4);
             display: block;
         }
     </style>
 </head>
 
 <body>
+    <h1>mobiumata</h1>
+    <p>
+        An attempt to bring together all of the possible states of the <a
+            href="https://github.com/chrisprice/mobiumata">mobiumata</a>.
+    </p>
+    <p>
+        Rules follow the <a
+            href="https://en.wikipedia.org/wiki/Elementary_cellular_automaton#The_numbering_system">Wolfram code</a>.
+        Zero (fill), wrap, and one (fill) are the three possible boundary conditions.
+        The location hash can be used to inject different initial states.
+    </p>
     <table id="table"></table>
-    <p>N.B. The location hash can be used to inject a different initial state.</p>
     <script>
         async function run() {
             let initialState = parseInt(location.hash.slice(1), 2);
