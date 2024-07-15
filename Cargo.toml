@@ -1,3 +1,3 @@
 [workspace]
 resolver = "2"
-members = ["mobiumata-display", "mobiumata-common", "mobiumata-control"]
+members = ["mobiumata-automaton", "mobiumata-display", "mobiumata-common", "mobiumata-control", "mobiumata-wasm"]

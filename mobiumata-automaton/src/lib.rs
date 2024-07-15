@@ -1,3 +1,7 @@
+#![no_std]
+
+use core::usize;
+
 use defmt::Format;
 use serde::{Deserialize, Serialize};
 
@@ -40,6 +44,26 @@ impl ElementaryCellularAutomaton {
             let index = (left as u8) << 2 | (center as u8) << 1 | right as u8;
             next_state[i] = (self.rule.0 >> index) & 1 == 1;
         }
+    }
+
+    pub fn period<const W: usize, const MAX: usize>(&self, initial_state: &[bool]) -> Option<usize> {
+        assert_eq!(initial_state.len(), W);
+
+        let mut state = [[false; W]; MAX];
+        state[0].copy_from_slice(initial_state);
+
+        for i in 1..MAX {
+            self.next_row(&mut state, i);
+        }
+
+        let last_index = MAX - 1;
+        for i in 1..MAX {
+            if state[last_index] == state[last_index - i] {
+                return Some(i);
+            }
+        }
+
+        None
     }
 
     pub fn next_row<const W: usize, const H: usize>(
@@ -113,6 +137,39 @@ mod tests {
         assert_eq!(
             next_state,
             [false, false, true, true, false, false, true, false, false]
+        );
+    }
+
+    #[test]
+    fn test_elementary_cellular_automaton_period() {
+        let automaton = ElementaryCellularAutomaton::new(Wrap::Wrap, Rule::new(2));
+        let initial_state = [false, false, false, false, false, false, false, true];
+
+        assert_eq!(automaton.period::<8, 192>(&initial_state), Some(8));
+    }
+
+    #[test]
+    fn test_elementary_cellular_automaton_next_row() {
+        let automaton = ElementaryCellularAutomaton::new(Wrap::Wrap, Rule::new(2));
+        let mut state = [[false; 8]; 192];
+        state[0] = [false, false, false, false, false, false, false, true];
+
+        automaton.next_row(&mut state, 1);
+        assert_eq!(
+            state[0],
+            [false, false,  false, false, false, false, false, true]
+        );
+
+        automaton.next_row(&mut state, 2);
+        assert_eq!(
+            state[1],
+            [false, false, false, false, false, false, true, false]
+        );
+
+        automaton.next_row(&mut state, 3);
+        assert_eq!(
+            state[2],
+            [false, false, false, false, false, true, false, false]
         );
     }
 }

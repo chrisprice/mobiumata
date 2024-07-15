@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Elementary Cellular Automata</title>
+    <meta name="viewport" content="width=1200, initial-scale=1.0">
+    <style>
+        body {
+            font-family: monospace;
+            background: #193f4a;
+            color: #f4af2d;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 10px;
+        }
+
+        th {
+            width: 33%;
+        }
+
+        th:first-child {
+            width: 0%;
+        }
+
+        td:first-child {
+            text-align: center;
+        }
+
+        canvas {
+            image-rendering: pixelated;
+            width: 100%;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <table id="table"></table>
+    <p>N.B. The location hash can be used to inject a different initial state.</p>
+    <script>
+        async function run() {
+            let initialState = parseInt(location.hash.slice(1), 2);
+            if (Number.isNaN(initialState) || initialState < 0 || initialState > 255) {
+                initialState = 255;
+                location.hash = "#" + initialState.toString(2);
+            }
+
+            window.addEventListener("hashchange", () => location.reload());
+
+            const mod = await WebAssembly.compileStreaming(fetch("target/wasm32-unknown-unknown/release/mobiumata_virtual_display.wasm"));
+            const instance = await WebAssembly.instantiate(mod);
+
+            const { exports: { ecm_next_zero, ecm_next_wrap, ecm_next_one, ecm_zero_period, ecm_wrap_period, ecm_one_period } } = instance;
+
+            const table = document.querySelector("#table");
+            table.innerHTML = `<thead><tr><th>Rule</th><th>Zero</th><th>Wrap</th><th>One</th></tr></thead><tbody></tbody>`;
+            const tbody = table.querySelector("tbody");
+
+            for (let rule = 0; rule < 256; rule++) {
+                const element = document.createElement("tr");
+                element.innerHTML = `<th>${rule}</th><td><canvas width="192" height="8"><td><canvas width="192" height="8"><td><canvas width="192" height="8"></td>`;
+                for (let wrap = 0; wrap < 3; wrap++) {
+                    const canvas = element.querySelectorAll("canvas")[wrap];
+                    const ctx = canvas.getContext("2d");
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                    let state = initialState;
+                    let period = [ecm_zero_period, ecm_wrap_period, ecm_one_period][wrap](rule, state);
+                    if (period === 0) {
+                        period = Number.POSITIVE_INFINITY;
+                    }
+                    for (let x = 0; x < canvas.width; x++) {
+                        for (let y = 0; y < canvas.height; y++) {
+                            const on = (state >> y) & 1 === 1;
+                            const repetition = canvas.width - x > period;
+                            const colors = [
+                                [25, 63, 74, 255],
+                                [244, 175, 45, 255],
+                                [255, 255, 254, 255],
+                                [47, 140, 163, 255],
+                                [3, 5, 4, 255],
+                            ];
+                            const color = on ?
+                                repetition ? colors[3] : colors[0] :
+                                repetition ? colors[4] : colors[1];
+                            imageData.data[y * canvas.width * 4 + x * 4 + 0] = color[0];
+                            imageData.data[y * canvas.width * 4 + x * 4 + 1] = color[1];
+                            imageData.data[y * canvas.width * 4 + x * 4 + 2] = color[2];
+                            imageData.data[y * canvas.width * 4 + x * 4 + 3] = color[3];
+                        }
+                        const new_state = [ecm_next_zero, ecm_next_wrap, ecm_next_one][wrap](rule, state);
+                        state = new_state;
+                    }
+
+                    ctx.putImageData(imageData, 0, 0);
+                }
+
+                tbody.appendChild(element);
+
+                await new Promise(resolve => requestAnimationFrame(resolve));
+            }
+
+        }
+
+        run();
+
+    </script>
+</body>
+
+</html>

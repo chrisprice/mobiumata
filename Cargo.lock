@@ -1082,6 +1082,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3c8dda44ff03a2f238717214da50f65d5a53b45cd213a7370424ffdb6fae815"
 
 [[package]]
+name = "mobiumata-automaton"
+version = "0.1.0"
+dependencies = [
+ "defmt",
+ "serde",
+]
+
+[[package]]
 name = "mobiumata-common"
 version = "0.1.0"
 dependencies = [
@@ -1099,6 +1107,7 @@ dependencies = [
  "fixed",
  "fixed-macro",
  "heapless 0.8.0",
+ "mobiumata-automaton",
  "pio",
  "rand",
  "serde",
@@ -1154,6 +1163,13 @@ dependencies = [
  "rand",
  "smart-leds",
  "static_cell",
+]
+
+[[package]]
+name = "mobiumata-virtual-display"
+version = "0.1.0"
+dependencies = [
+ "mobiumata-automaton",
 ]
 
 [[package]]
