@@ -37,6 +37,7 @@
     <p>
         An attempt to bring together all of the possible states of the <a
             href="https://github.com/chrisprice/mobiumata">mobiumata</a>.
+        For each state, the non-repeating period is highlighted.
     </p>
     <p>
         Rules follow the <a
@@ -89,8 +90,8 @@
                                 [3, 5, 4, 255],
                             ];
                             const color = on ?
-                                repetition ? colors[3] : colors[0] :
-                                repetition ? colors[4] : colors[1];
+                                repetition ? colors[3] : colors[1] :
+                                repetition ? colors[4] : colors[0];
                             imageData.data[y * canvas.width * 4 + x * 4 + 0] = color[0];
                             imageData.data[y * canvas.width * 4 + x * 4 + 1] = color[1];
                             imageData.data[y * canvas.width * 4 + x * 4 + 2] = color[2];
