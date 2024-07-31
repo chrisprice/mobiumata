@@ -1,6 +1,6 @@
 # Mobiumata
 
-Mobiumata (a concatenation of Möbius strip and cellular automata) is a small interactive art piece that allows folk to play god to 6,000 LED cells wrapped into a Möbius strip.
+Mobiumata (a concatenation of Möbius strip and cellular automata) is a small interactive art piece that allows folk to play god to 1,500 LED cells wrapped into a Möbius strip.
 
 [![Mobiumata overview](http://img.youtube.com/vi/JmTJu0U6ejs/0.jpg)](http://www.youtube.com/watch?v=JmTJu0U6ejs "Mobiumata - overview")
 
