@@ -60,7 +60,7 @@ async fn main(spawner: Spawner) {
         Mode::Station,
         env!("WIFI_SSID"),
         env!("WIFI_PASSPHRASE"),
-        Ipv4Cidr::new(Ipv4Address::new(192, 168, 1, 217), 24),
+        None,
         spi,
         Output::new(p.PIN_23, Level::Low),
     )
